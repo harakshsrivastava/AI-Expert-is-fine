@@ -1,25 +1,16 @@
 
-"""AI Movie Recommendation System 2.0
-
-Install: pip install pandas scikit-learn textblob colorama
-Place imdb_top_1000.csv beside this script, then run with Python 3.
-"""
 from pathlib import Path
 import random
 import time
 import textwrap
-
 import pandas as pd
 from colorama import Fore, Style, init
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from textblob import TextBlob
-
 init(autoreset=True)
 DATASET = Path(__file__).resolve().parent / 'imdb_top_1000.csv'
 REQUIRED = {'Series_Title', 'Genre', 'Overview', 'IMDB_Rating'}
-
-
 def load_movies():
     try:
         movies = pd.read_csv(DATASET)
@@ -37,30 +28,23 @@ def load_movies():
     if movies.empty:
         raise SystemExit(Fore.RED + 'The dataset contains no valid movies.')
     movies['polarity'] = movies['Overview'].map(lambda s: TextBlob(s).sentiment.polarity)
-    # Build TF-IDF features once, rather than recomputing for each request.
     movies['features'] = movies['Genre'].str.replace(',', ' ', regex=False) + ' ' + movies['Overview']
     vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
     matrix = vectorizer.fit_transform(movies['features'])
     genres = sorted({g.strip() for entry in movies['Genre'] for g in entry.split(',') if g.strip()})
     return movies, vectorizer, matrix, genres
-
-
 def sentiment_label(score):
     if score > 0.05:
         return 'Positive 😊'
     if score < -0.05:
         return 'Negative 😞'
     return 'Neutral 😐'
-
-
 def ask_choice(prompt, choices):
     while True:
         value = input(Fore.YELLOW + prompt).strip().lower()
         if value in choices:
             return value
         print(Fore.RED + 'Invalid choice. Try again.')
-
-
 def ask_genre(genres):
     print(Fore.GREEN + '\nAvailable genres:')
     print(Fore.CYAN + '0. Any genre')
@@ -76,8 +60,6 @@ def ask_genre(genres):
             if answer.casefold() == genre.casefold():
                 return genre
         print(Fore.RED + 'Please choose a listed genre.')
-
-
 def ask_rating(movies):
     low, high = float(movies['IMDB_Rating'].min()), float(movies['IMDB_Rating'].max())
     while True:
@@ -91,8 +73,6 @@ def ask_rating(movies):
         except ValueError:
             pass
         print(Fore.RED + 'Enter a valid rating in the displayed range, or skip.')
-
-
 def recommend(movies, vectorizer, matrix, mode, genre, mood, rating, themes, seen, count=5):
     candidates = movies
     if genre:
@@ -109,8 +89,6 @@ def recommend(movies, vectorizer, matrix, mode, genre, mood, rating, themes, see
     if mode == 'random':
         chosen = unseen.sample(n=min(count, len(unseen)))
     else:
-        # Similarity uses movie descriptions and genre, not just random sampling.
-        # Mood and themes become query text. Polarity is a small secondary signal.
         query = ' '.join(part for part in [genre or '', mood, themes] if part).strip()
         if query:
             query_vector = vectorizer.transform([query])
@@ -122,13 +100,10 @@ def recommend(movies, vectorizer, matrix, mode, genre, mood, rating, themes, see
         scored['match_score'] = scores
         if mood:
             scored['match_score'] += 0.10 * (1 - (scored['polarity'] - target_polarity).abs() / 2)
-        # A small rating tie-breaker rewards quality when similarity is close.
         scored['match_score'] += 0.01 * scored['IMDB_Rating'] / 10
         chosen = scored.sort_values(['match_score', 'IMDB_Rating'], ascending=False).head(count)
     seen.update(int(i) for i in chosen.index)
     return [row for _, row in chosen.iterrows()], restarted
-
-
 def display(recommendations, name, mode):
     print(Fore.YELLOW + f'\n🍿 {mode.title()} Movie Recommendations for {name}:\n')
     if not recommendations:
@@ -141,8 +116,6 @@ def display(recommendations, name, mode):
         print(f'   Overview: {textwrap.fill(movie["Overview"] or "No overview available.", width=85, subsequent_indent="      ")}')
         print(f'   Overview sentiment: {sentiment_label(movie["polarity"])} (polarity {movie["polarity"]:+.2f})')
         print()
-
-
 def main():
     movies, vectorizer, matrix, genres = load_movies()
     print(Fore.BLUE + '🎥 Welcome to your Personal Movie Recommendation Assistant! 🎥')
@@ -186,8 +159,6 @@ def main():
                 return
             break
     print(Fore.GREEN + f'\nEnjoy your movie picks, {name}! 🎬🍿')
-
-
 if __name__ == '__main__':
     try:
         main()
